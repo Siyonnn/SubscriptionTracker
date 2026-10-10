@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { daysBetween, getPaymentStatus, todayString } from '../lib/billing.js'
 import { formatDate, formatPrice } from '../lib/format.js'
 import Modal from './Modal.jsx'
 import PaymentHistory from './PaymentHistory.jsx'
@@ -10,8 +9,8 @@ const CYCLE_LABELS = {
   yearly: 'year',
 }
 
-function DueLine({ subscription }) {
-  const { status, nextPaymentDate, overduePeriods } = getPaymentStatus(subscription)
+function DueLine({ payment }) {
+  const { status, nextPaymentDate, daysUntilDue: days, overduePeriods } = payment
   const date = formatDate(nextPaymentDate)
 
   if (status === 'paid') {
@@ -32,7 +31,6 @@ function DueLine({ subscription }) {
     )
   }
   if (status === 'dueSoon') {
-    const days = daysBetween(todayString(), nextPaymentDate)
     const label = days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `Due in ${days} days`
     return (
       <p className="due">
@@ -46,6 +44,7 @@ function DueLine({ subscription }) {
 export default function SubscriptionCard({
   uid,
   subscription,
+  payment,
   onMarkPaid,
   onUndoPayment,
   onEdit,
@@ -53,7 +52,6 @@ export default function SubscriptionCard({
 }) {
   const [imageFailed, setImageFailed] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const { status } = getPaymentStatus(subscription)
   const name = subscription.subscriptionName
   const showImage = subscription.image && !imageFailed
 
@@ -82,7 +80,7 @@ export default function SubscriptionCard({
         {formatPrice(subscription.price, subscription.currency)}{' '}
         <span className="muted">/ {CYCLE_LABELS[subscription.billingCycle]}</span>
       </p>
-      <DueLine subscription={subscription} />
+      <DueLine payment={payment} />
 
       {/* The labels name the subscription so each button is distinct in a screen reader's list. */}
       <div className="card-footer">
@@ -107,7 +105,7 @@ export default function SubscriptionCard({
             Delete
           </button>
         </div>
-        {status !== 'paid' && (
+        {payment.status !== 'paid' && (
           <button
             type="button"
             className="small"

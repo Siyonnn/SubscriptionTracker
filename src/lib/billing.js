@@ -14,7 +14,7 @@ function parseDate(dateStr) {
   return new Date(y, m - 1, d)
 }
 
-function formatDate(date) {
+function toDateString(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
@@ -22,10 +22,10 @@ function formatDate(date) {
 }
 
 export function todayString(now = new Date()) {
-  return formatDate(now)
+  return toDateString(now)
 }
 
-export function daysBetween(fromStr, toStr) {
+function daysBetween(fromStr, toStr) {
   return Math.round((parseDate(toStr) - parseDate(fromStr)) / DAY_MS)
 }
 
@@ -35,7 +35,7 @@ function addMonthsClamped(dateStr, months) {
   const [y, m, d] = dateStr.split('-').map(Number)
   const target = new Date(y, m - 1 + months, 1)
   const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
-  return formatDate(new Date(target.getFullYear(), target.getMonth(), Math.min(d, lastDay)))
+  return toDateString(new Date(target.getFullYear(), target.getMonth(), Math.min(d, lastDay)))
 }
 
 // The due date of the period n cycles after firstDueDate.
@@ -43,7 +43,7 @@ export function addCycles(firstDueDate, billingCycle, n) {
   if (billingCycle === 'weekly') {
     const date = parseDate(firstDueDate)
     date.setDate(date.getDate() + 7 * n)
-    return formatDate(date)
+    return toDateString(date)
   }
   if (billingCycle === 'monthly') return addMonthsClamped(firstDueDate, n)
   if (billingCycle === 'yearly') return addMonthsClamped(firstDueDate, 12 * n)
@@ -88,24 +88,23 @@ function countOverduePeriods(subscription, today) {
   return count
 }
 
+// Everything the screens need to know about where a subscription stands today.
 // Status priority: paid, overdue, due soon, upcoming.
 export function getPaymentStatus(subscription, today = todayString()) {
   const next = nextPaymentDate(subscription)
+  const daysUntilDue = daysBetween(today, next)
 
-  if (subscription.lastPaidDate && today < next) {
-    return { status: 'paid', nextPaymentDate: next, overduePeriods: 0 }
+  let status = 'upcoming'
+  if (subscription.lastPaidDate && today < next) status = 'paid'
+  else if (next < today) status = 'overdue'
+  else if (daysUntilDue <= UPCOMING_WINDOW_DAYS) status = 'dueSoon'
+
+  return {
+    status,
+    nextPaymentDate: next,
+    daysUntilDue,
+    overduePeriods: status === 'overdue' ? countOverduePeriods(subscription, today) : 0,
   }
-  if (next < today) {
-    return {
-      status: 'overdue',
-      nextPaymentDate: next,
-      overduePeriods: countOverduePeriods(subscription, today),
-    }
-  }
-  if (daysBetween(today, next) <= UPCOMING_WINDOW_DAYS) {
-    return { status: 'dueSoon', nextPaymentDate: next, overduePeriods: 0 }
-  }
-  return { status: 'upcoming', nextPaymentDate: next, overduePeriods: 0 }
 }
 
 // Totals per currency. Yearly is monthly * 12. Amounts are not converted between currencies.

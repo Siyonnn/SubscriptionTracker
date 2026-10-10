@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase.js'
-import { getPaymentStatus, nextPaymentDate } from '../lib/billing.js'
+import { getPaymentStatus } from '../lib/billing.js'
 import { NO_FILTERS, filterSubscriptions } from '../lib/filters.js'
 import {
   addSubscription,
@@ -80,24 +81,17 @@ export default function Dashboard({ user }) {
   }
 
   // The button that opened a dialog can be gone once the dialog's action is done (a deleted card,
-  // or "Mark paid" on a card that is now paid). Without this, keyboard focus drops to the page.
+  // or "Mark paid" on a card that is now paid), which would drop keyboard focus to the page.
+  // flushSync removes the dialog first, because nothing behind an open dialog can take focus.
   const headingRef = useRef(null)
   const addButtonRef = useRef(null)
-  const [focusListNext, setFocusListNext] = useState(false)
 
-  useEffect(() => {
-    if (!focusListNext || confirming) return
-    ;(headingRef.current ?? addButtonRef.current).focus()
-    setFocusListNext(false)
-  }, [focusListNext, confirming])
-
-  function closeConfirmAndFocusList() {
-    setConfirming(null)
-    setFocusListNext(true)
+  function closeConfirmAndFocus(target) {
+    flushSync(() => setConfirming(null))
+    target.current.focus()
   }
 
-  function handleMarkPaid(subscription) {
-    const { overduePeriods } = getPaymentStatus(subscription)
+  function handleMarkPaid(subscription, overduePeriods) {
     if (overduePeriods > 1) {
       askHowManyToPay(subscription, overduePeriods)
     } else {
@@ -112,7 +106,7 @@ export default function Dashboard({ user }) {
       confirmLabel: `Mark all ${overduePeriods} paid`,
       onConfirm: () => {
         pay(subscription, overduePeriods)
-        closeConfirmAndFocusList()
+        closeConfirmAndFocus(headingRef)
       },
       alternative: {
         label: 'Oldest only',
@@ -156,7 +150,8 @@ export default function Dashboard({ user }) {
           deleteSubscription(user.uid, subscription.id),
           `Could not delete ${subscription.subscriptionName}. It is still in your list.`,
         )
-        closeConfirmAndFocusList()
+        // The heading goes away with the last card, so use the button that is always there.
+        closeConfirmAndFocus(subscriptions.length > 1 ? headingRef : addButtonRef)
       },
     })
   }
@@ -174,8 +169,14 @@ export default function Dashboard({ user }) {
   }
 
   const hasSubscriptions = subscriptions?.length > 0
-  const sorted = filterSubscriptions(subscriptions ?? [], filters).sort((a, b) =>
-    nextPaymentDate(a).localeCompare(nextPaymentDate(b)),
+  // Each subscription's status is worked out once here and passed down, so the filters,
+  // the order, and the cards all agree.
+  const rows = (subscriptions ?? []).map((subscription) => ({
+    subscription,
+    payment: getPaymentStatus(subscription),
+  }))
+  const shown = filterSubscriptions(rows, filters).sort((a, b) =>
+    a.payment.nextPaymentDate.localeCompare(b.payment.nextPaymentDate),
   )
 
   return (
@@ -240,15 +241,16 @@ export default function Dashboard({ user }) {
             Your subscriptions
           </h2>
           <Filters filters={filters} onChange={setFilters} />
-          {sorted.length === 0 && <p className="muted">No subscriptions match these filters.</p>}
+          {shown.length === 0 && <p className="muted">No subscriptions match these filters.</p>}
 
           <div className="card-grid">
-            {sorted.map((subscription) => (
+            {shown.map(({ subscription, payment }) => (
               <SubscriptionCard
                 key={subscription.id}
                 uid={user.uid}
                 subscription={subscription}
-                onMarkPaid={() => handleMarkPaid(subscription)}
+                payment={payment}
+                onMarkPaid={() => handleMarkPaid(subscription, payment.overduePeriods)}
                 onUndoPayment={() => askToUndoPayment(subscription)}
                 onEdit={() => setEditing(subscription)}
                 onDelete={() => askToDelete(subscription)}

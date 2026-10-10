@@ -84,6 +84,12 @@ describe('getPaymentStatus', () => {
     expect(result.overduePeriods).toBe(4)
   })
 
+  it('reports the days until the next payment, negative once it has passed', () => {
+    expect(getPaymentStatus(base, '2026-05-29').daysUntilDue).toBe(3)
+    expect(getPaymentStatus(base, '2026-06-01').daysUntilDue).toBe(0)
+    expect(getPaymentStatus(base, '2026-06-03').daysUntilDue).toBe(-2)
+  })
+
   it('does not count a period that is due today as overdue', () => {
     const sub = { firstDueDate: '2026-09-10', billingCycle: 'monthly', lastPaidDate: null }
     expect(getPaymentStatus(sub, '2026-10-10').overduePeriods).toBe(1)

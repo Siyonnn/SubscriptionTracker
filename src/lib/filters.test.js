@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getPaymentStatus } from './billing.js'
 import { NO_FILTERS, filterSubscriptions } from './filters.js'
 
 const TODAY = '2026-06-10'
@@ -24,11 +25,14 @@ const claude = {
   firstDueDate: '2026-05-20',
   lastPaidDate: null,
 }
-const all = [netflix, spotify, claude]
+const rows = [netflix, spotify, claude].map((subscription) => ({
+  subscription,
+  payment: getPaymentStatus(subscription, TODAY),
+}))
 
 function names(filters) {
-  return filterSubscriptions(all, { ...NO_FILTERS, ...filters }, TODAY).map(
-    (s) => s.subscriptionName,
+  return filterSubscriptions(rows, { ...NO_FILTERS, ...filters }).map(
+    (row) => row.subscription.subscriptionName,
   )
 }
 
