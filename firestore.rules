@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // Matches the form checks in src/lib/validation.js and the lists in SubscriptionForm.jsx.
+    // The app cannot draw a subscription outside these values, so the server refuses them.
+    function isValidSubscription(data) {
+      return data.subscriptionName is string
+        && data.subscriptionName.size() > 0
+        && data.subscriptionName.size() <= 60
+        && data.price is number
+        && data.price >= 0.01
+        && data.price <= 1000000
+        && data.currency in ['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'SGD']
+        && data.billingCycle in ['weekly', 'monthly', 'yearly']
+        && isDate(data.firstDueDate)
+        && (data.lastPaidDate == null || isDate(data.lastPaidDate));
+    }
+
+    // Each user can read and write only their own subscriptions.
+    match /users/{userId}/subscriptions/{subscriptionId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidSubscription(request.resource.data);
+
+      match /payments/{paymentId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
