@@ -1,6 +1,8 @@
+// Turns a stored "YYYY-MM-DD" date into MM/DD/YYYY for display, on screen and in reminders.
+// Built by hand so it looks the same in every browser and on the server that sends reminders.
 export function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { dateStyle: 'medium' })
+  const [y, m, d] = dateStr.split('-')
+  return `${m}/${d}/${y}`
 }
 
 export function formatPrice(price, currency) {

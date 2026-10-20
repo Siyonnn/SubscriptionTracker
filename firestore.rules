@@ -34,5 +34,14 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
     }
+
+    // One record per browser that has reminders turned on. The daily job reads these with
+    // admin access, which these rules don't apply to.
+    match /users/{userId}/devices/{token} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.timeZone is string
+        && request.resource.data.timeZone.size() <= 64;
+    }
   }
 }

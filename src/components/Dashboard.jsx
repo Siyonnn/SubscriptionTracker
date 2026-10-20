@@ -12,12 +12,14 @@ import {
   updateSubscription,
   watchSubscriptions,
 } from '../lib/subscriptions.js'
+import { turnOffReminders } from '../lib/pushReminders.js'
 import { formatDate } from '../lib/format.js'
 import ConfirmDialog from './ConfirmDialog.jsx'
 import ExpenseSummary from './ExpenseSummary.jsx'
 import Filters from './Filters.jsx'
 import Modal from './Modal.jsx'
 import SubscriptionCard from './SubscriptionCard.jsx'
+import RemindersToggle from './RemindersToggle.jsx'
 import SubscriptionForm from './SubscriptionForm.jsx'
 
 function watchOnline(onChange) {
@@ -164,7 +166,14 @@ export default function Dashboard({ user }) {
         ? 'You will need your email and password to log back in.'
         : "You're offline. Changes that have not been sent yet will be lost if you log out now.",
       confirmLabel: 'Log out',
-      onConfirm: () => signOut(auth),
+      onConfirm: async () => {
+        // Someone else may use this browser next, so it stops getting this account's reminders.
+        // The record can only be removed while still logged in; give up after a few seconds
+        // rather than hold up logging out when offline.
+        const giveUp = new Promise((resolve) => setTimeout(resolve, 3000))
+        await Promise.race([turnOffReminders(user.uid).catch(() => {}), giveUp])
+        signOut(auth)
+      },
     })
   }
 
@@ -185,6 +194,7 @@ export default function Dashboard({ user }) {
         <h1>Subscription Tracker</h1>
         <div className="topbar-account">
           <span className="muted">{user.email}</span>
+          <RemindersToggle uid={user.uid} onMessage={setNotice} />
           <button type="button" className="secondary small" onClick={askToLogOut}>
             Log out
           </button>

@@ -58,9 +58,17 @@ Evaluated in this order:
 - The Firestore rules also check each subscription's name, price, currency, billing cycle, and dates.
 - Firestore rules: a user can read and write only their own data (`users/{uid}/subscriptions/...`).
 
+## Payment reminders
+
+- Push notifications through Firebase Cloud Messaging, turned on per browser from the dashboard.
+- Sent 3 days before a payment, on the day it's due, and every day while it's overdue. One notification per subscription.
+- A daily GitHub Actions job sends them at 9:00 AM Philippine time. "Today" is worked out in each browser's own time zone, using the same date rules as the dashboard.
+- Each browser is saved at `users/{uid}/devices/{token}` with its time zone. Logging out removes this browser's record, so the next person to use it doesn't get the previous account's reminders.
+- iPhones need the site added to the Home Screen first.
+
 ## Out of scope for v1
 
-Email or push reminders, image uploads, currency conversion, CSV export, charts.
+Email reminders, image uploads, currency conversion, CSV export, charts.
 
 ## Build order
 

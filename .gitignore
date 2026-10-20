@@ -4,3 +4,5 @@ dist
 .env.local
 *.log
 .firebase
+# Service account keys give full access to the Firebase project. Never commit one.
+*firebase-adminsdk*.json
